@@ -7,8 +7,8 @@
 // see: https://github.com/webpack-contrib/worker-loader/issues/145
 // and https://github.com/webpack-contrib/worker-loader/issues/139
 //
-// The 
-// 
+// The
+//
 // So were using the old school way, where we copy over this script to the root
 // so the Worker() constructor can use it directly.
 
@@ -16,13 +16,16 @@ importScripts("./socket.io.js");
 console.log("starting probes disco...");
 
 let socket = io("https://atlas-stream.ripe.net:443", {
-    path: "/stream/socket.io",
-    transports: ["websocket"],
-    upgrade: false
+  path: "/stream/socket.io",
+  transports: ["websocket"],
+  upgrade: false
 });
 
-socket.emit("atlas_subscribe", { stream_type: "probestatus" });
+socket.emit("atlas_subscribe", {
+  stream_type: "probestatus",
+  enrichProbes: true
+});
 
 socket.on("atlas_probestatus", r => {
-    self.postMessage(JSON.stringify(r, null));
+  self.postMessage(JSON.stringify(r, null));
 });
