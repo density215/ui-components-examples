@@ -217,7 +217,6 @@ export class ProbesHexbinMap extends React.Component {
             >
                 <ProjectedPaths
                     paths={this.state.probes}
-                    probeChanged={this.state.probeChanged}
                     width={this.props.width}
                     height={this.props.height}
                 />
