@@ -1,0 +1,41 @@
+{
+  "name": "ui-components-examples",
+  "version": "0.0.1-alpha",
+  "description": "Examples for the RIPE RnD UI React components",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "webpack-dev-server -d --progress --port 4040 --config webpack.config.js"
+  },
+  "author": "Jasper den Hertog",
+  "license": "ISC",
+  "dependencies": {
+    "babel-preset-react": "^6.24.1",
+    "react": "^16.3.2",
+    "react-dom": "^16.3.2"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.3",
+    "babel-loader": "^7.1.4",
+    "babel-minify": "^0.4.3",
+    "babel-plugin-transform-react-jsx": "^6.24.1",
+    "babel-preset-env": "^1.7.0",
+    "babel-preset-stage-2": "^6.24.1",
+    "babel-root-import": "^4.1.8",
+    "copy-webpack-plugin": "^4.5.1",
+    "d3-array": "^1.2.1",
+    "d3-geo-projection": "^2.4.0",
+    "d3-hexbin": "^0.2.2",
+    "d3-interpolate": "^1.2.0",
+    "d3-scale": "^2.0.0",
+    "d3-selection": "^1.3.0",
+    "d3-time-format": "^2.1.1",
+    "react-hot-loader": "^4.2.0",
+    "socket.io-client": "^2.1.1",
+    "styled-components": "^3.3.2",
+    "webpack": "^4.8.3",
+    "webpack-cli": "^2.1.3",
+    "webpack-dev-server": "^3.1.4",
+    "worker-loader": "^2.0.0"
+  }
+}
