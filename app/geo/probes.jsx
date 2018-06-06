@@ -71,7 +71,8 @@ export const loadProbesInfo = async ({ ...props }) => {
     .map(p => [null, null, ...p]);
 };
 
-export const loadNewProbeInfo = async ({ ...props }) => {
+export const loadNewProbeInfo = async prb_id => {
+  const fetchUrl = `https://atlas.ripen.net/api/v2/${prb_id}`;
   let reponse = await fetch(fetchUrl).catch(err => {
     console.log(err);
     console.log(`${fetchUrl} does not exist.`);
@@ -99,16 +100,18 @@ export const transformProbesData = (probesData, projection) => {
 };
 
 const blip = keyframes`
-    from: { stroke-width: 0; }
-    50% { stroke-width: 13;}
-    to { stroke-width: 0; }
+    from: { stroke-width: 0.2; }
+    50% { transform: scale(9.0); }
+    to { stroke-width: 0.2; }
 `;
 
 const StyledProbeStatusChanger = styled.circle`
-  stroke-width: 1;
-  fill: ${props => (props.status === "connect" && "green") || "black"};
+  stroke-width: 0.2;
+  //fill: ${props => (props.status === "connect" && "green") || "black"};
+  fill: none;
   stroke: ${props => (props.status === "connect" && "green") || "black"};
   animation: ${blip} 1.6s ease-in 5;
+  transform-origin: ${props => `-${props.dx / 8 }px -${props.dy / 8}px`};
 `;
 
 export class ProbeStatusChanger extends React.Component {
@@ -116,8 +119,12 @@ export class ProbeStatusChanger extends React.Component {
     return (
       <StyledProbeStatusChanger
         transform={`translate(${this.props.dx},${this.props.dy})`}
-        r="1"
+        //transformOrigin={`${this.props.dx},${this.props.dy}`}
+        r={1 / this.props.zoomFactor}
         status={this.props.status}
+        dx={this.props.dx}
+        dy={this.props.dy}
+        vectorEffect="non-scaling-stroke"
       />
     );
   }
@@ -128,13 +135,7 @@ export class ProjectedPaths extends React.PureComponent {
     super(props);
     this.paths = [];
 
-    this.hexbin = hexbin()
-      .extent([[0, 0], [this.props.width, this.props.height]])
-      .radius(3.0);
-
-    this.radius = scaleSqrt()
-      .domain([10, 1000])
-      .range([2, 7.5]);
+    this.calculateHexBin();
 
     // this.color = scaleTime()
     //   .domain([
@@ -145,12 +146,31 @@ export class ProjectedPaths extends React.PureComponent {
     //   .interpolate(interpolateLab);
     this.color = scaleLinear()
       .domain([2, 1])
-      .range([oimAntracite, "lightgreen"])
+      .range(["#FF0050", "#00B213"])
+      .interpolate(interpolateLab);
+
+    this.asColor = scaleLinear()
+      .domain([0.2, 1.0])
+      .range(["#F4FFF5", "#00B213"])
       .interpolate(interpolateLab);
 
     this.state = {
       pathsInitialized: false
     };
+  }
+
+  calculateHexBin(zoomFactor = 1) {
+    this.hexbin = hexbin()
+      .extent([[0, 0], [this.props.width, this.props.height]])
+      // radius of catchment area, so probes within this radius end up
+      // in one hexbin.
+      .radius(7.5 / zoomFactor);
+
+    // map number of probes in hexbin to the size
+    // of the hexbin on screen
+    this.radius = scaleSqrt()
+      .domain([10, 1000])
+      .range([2, 2 + 7.5 / zoomFactor]);
   }
 
   componentDidMount() {
@@ -170,11 +190,19 @@ export class ProjectedPaths extends React.PureComponent {
   componentWillReceiveProps(nextProps) {
     if (nextProps.paths && !this.props.paths) {
       console.log("paths received");
-
       this.paths = this.hexbin(
         transformProbesData(nextProps.paths, this.props.projection)
       ).sort((a, b) => b.length - a.length);
       this.setState({ pathsInitialized: true });
+    }
+
+    if (nextProps.zoomFactor !== this.props.zoomFactor) {
+      console.log("zoomert on paths");
+      console.log(`zoomFactor : ${nextProps.zoomFactor}`);
+      this.calculateHexBin(nextProps.zoomFactor);
+      this.paths = this.hexbin(
+        transformProbesData(nextProps.paths, this.props.projection)
+      ).sort((a, b) => b.length - a.length);
     }
   }
 
@@ -183,6 +211,9 @@ export class ProjectedPaths extends React.PureComponent {
     window.mean = mean;
     window.median = median;
     window.histogram = histogram;
+    console.log(
+      this.paths.reduce((acc, next) => Math.max(acc, next.length), 0)
+    );
     return (
       <g>
         {this.paths &&
@@ -192,27 +223,38 @@ export class ProjectedPaths extends React.PureComponent {
                 acc[asn] = (acc[asn] && acc[asn] + 1) || 1;
                 return acc;
               }, {}),
-              asDensity = Object.keys(asDistribution).length / p.length;
-            console.log(
-              `${Object.keys(asDistribution)}; (${p.length}) -> ${Object.keys(
-                asDistribution
-              ).length / p.length}`
-            );
+              asDensity = Object.keys(asDistribution).length / p.length,
+              scale = ` scale(${Math.min(
+                (p.length > 1 && 1.0) || 2.0,
+                3 / this.props.zoomFactor
+              )})`;
+            //console.log(
+            //   `${Object.keys(asDistribution)}; (${p.length}) -> ${Object.keys(
+            //     asDistribution
+            //   ).length / p.length}`
+            // );
             return (
               <path
                 className="hexagon"
                 key={`h_${p.x}_${p.y}`}
-                d={this.hexbin.hexagon(this.radius(p.length))}
-                transform={`translate(${p.x},${p.y})`}
-                //fill={this.color(median(p, p => +p.date))}
-                fill={this.color(mean(p, p => +p[14]))}
-                strokeWidth={
-                  asDensity *
-                  0.4 *
-                  this.props.zoomFactor *
-                  (p.length === 1 && 0.1 || 1)
+                d={
+                  (p.length > 1 &&
+                    this.hexbin.hexagon(this.radius(p.length))) ||
+                  "M 0,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0"
                 }
-                stroke={p.length === 1 && "none" || "grey"}
+                transform={`translate(${(p.length > 1 && p.x) ||
+                  p[0][0]},${(p.length > 1 && p.y) || p[0][1]})${scale}`}
+                //fill={this.color(median(p, p => +p.date))}
+                //fill={this.color(mean(p, p => +p[14]))}
+                fill={
+                  ((p.length > 1 || p[0][14] !== 2) &&
+                    this.asColor(asDensity)) ||
+                  "none"
+                }
+                stroke={this.color(mean(p, p => +p[14]))}
+                strokeWidth={
+                  (p.length > 1 && this.radius(p.length) / 5) || "0.2"
+                }
               />
             );
           })}
@@ -263,7 +305,7 @@ export class ProbesHexbinMap extends React.Component {
             console.log(newProbeStatus);
             console.log(thisProbe);
             if (!thisProbe) {
-              thisProbe = loadNewProbeInfo().then(d => {
+              thisProbe = loadNewProbeInfo(newProbeStatus.prb_id).then(d => {
                 const coords = this.props.projection([
                   d.geometry.coordinates[0],
                   d.geometry.coordinates[1]
@@ -316,6 +358,7 @@ export class ProbesHexbinMap extends React.Component {
         translate={[740, 470]}
         projection={projection}
         countries={this.state.countries}
+        maxZoomFactor={24}
       >
         <ProjectedPaths
           paths={this.state.probes}
