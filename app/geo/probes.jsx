@@ -3,7 +3,7 @@ import React from "react";
 import { timeParse } from "d3-time-format";
 import { hexbin } from "d3-hexbin";
 import { select, selectAll } from "d3-selection";
-import { median, mean } from "d3-array";
+import { median, mean, variance, histogram } from "d3-array";
 import { scaleSqrt, scaleTime, scaleLinear } from "d3-scale";
 import { interpolateLab } from "d3-interpolate";
 import styled, { keyframes } from "styled-components";
@@ -26,7 +26,7 @@ export const loadProbesInfo = async ({ ...props }) => {
   /* django doesn't get any faster than this.
   * The super-secret undocumented /probes/all call.
   * 
-  * format:
+  * input format:
   *  [
   *   0           probe.pk,
   *   1           probe.asn_v4 if probe.asn_v4 else 0,
@@ -44,6 +44,14 @@ export const loadProbesInfo = async ({ ...props }) => {
   *   13         int(probe.status_since.strftime("%s")) if probe.status_since is not None else None
   *  ]
   * 
+  * Now, no matter what you try, d3 will want to use the first to elements in this array MUTABLY
+  * for its x,y coordinates. So we're outputting the array from index 2, thereby reserving for 0,1
+  * for d3 weirdness.
+  * 
+  * output format:
+  *  [
+  *     d3X, d3Y, ...rest of the input array
+  *  ]
   */
 
   const fetchUrl = "https://atlas-ui1.atlas.ripe.net/api/v2/probes/all";
@@ -58,7 +66,9 @@ export const loadProbesInfo = async ({ ...props }) => {
     return null;
   });
   // yes, there are probes with location NULL, so kick those out.
-  return probesData.probes.filter(p => p[6] && p[7]);
+  return probesData.probes
+    .filter(p => p[6] && p[7])
+    .map(p => [null, null, ...p]);
 };
 
 export const loadNewProbeInfo = async ({ ...props }) => {
@@ -77,12 +87,12 @@ export const loadNewProbeInfo = async ({ ...props }) => {
 
 export const transformProbesData = (probesData, projection) => {
   return probesData.map(d => {
-    const p = projection([d[7], d[6]]);
-    d[14] = d.slice(0, 1)[0];
+    const p = projection([d[9], d[8]]);
+    //d[14] = d.slice(0, 1)[0];
     //d.prb_id = d.slice(0,1); // copy first element, otherwise D3 will f*ck your
     //(d[0] = p[0]), (d[1] = p[1]);
     [d[0], d[1]] = p.slice(0, 2);
-    d.date = timeParse("%s")(d[13]);
+    d.date = timeParse("%s")(d[15]);
     //d.unshift(p[0], p[1]);
     return d;
   });
@@ -172,10 +182,22 @@ export class ProjectedPaths extends React.PureComponent {
     window.color = this.color;
     window.mean = mean;
     window.median = median;
+    window.histogram = histogram;
     return (
       <g>
         {this.paths &&
           this.paths.map(p => {
+            const asDistribution = p.reduce((acc, next) => {
+                const asn = next[3] || next[4] || 0;
+                acc[asn] = (acc[asn] && acc[asn] + 1) || 1;
+                return acc;
+              }, {}),
+              asDensity = Object.keys(asDistribution).length / p.length;
+            console.log(
+              `${Object.keys(asDistribution)}; (${p.length}) -> ${Object.keys(
+                asDistribution
+              ).length / p.length}`
+            );
             return (
               <path
                 className="hexagon"
@@ -183,9 +205,14 @@ export class ProjectedPaths extends React.PureComponent {
                 d={this.hexbin.hexagon(this.radius(p.length))}
                 transform={`translate(${p.x},${p.y})`}
                 //fill={this.color(median(p, p => +p.date))}
-                fill={this.color(mean(p, p => +p[12]))}
-                strokeWidth="0.2pt"
-                stroke={oimAntracite}
+                fill={this.color(mean(p, p => +p[14]))}
+                strokeWidth={
+                  asDensity *
+                  0.4 *
+                  this.props.zoomFactor *
+                  (p.length === 1 && 0.1 || 1)
+                }
+                stroke={p.length === 1 && "none" || "grey"}
               />
             );
           })}
@@ -227,10 +254,10 @@ export class ProbesHexbinMap extends React.Component {
           const probeUpdater = new Worker("./worker.js");
           probeUpdater.onmessage = m => {
             console.log(m.data);
-            console.log(probesData[0][14]);
+            console.log(probesData[0][3]);
             const newProbeStatus = JSON.parse(m.data);
             let thisProbe = probesData.find(
-              p => p[14] === newProbeStatus.prb_id
+              p => p[2] === newProbeStatus.prb_id
             );
 
             console.log(newProbeStatus);
@@ -253,7 +280,7 @@ export class ProbesHexbinMap extends React.Component {
                 changedProbes: [
                   ...this.state.changedProbes,
                   {
-                    prb_id: thisProbe[14],
+                    prb_id: thisProbe[2],
                     status: newProbeStatus.event,
                     dx: thisProbe[0],
                     dy: thisProbe[1]
