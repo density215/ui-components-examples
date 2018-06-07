@@ -182,8 +182,8 @@ export class ProjectedPaths extends React.PureComponent {
     // map number of probes in hexbin to the size
     // of the hexbin on screen
     this.radius = scaleSqrt()
-      .domain([10, 1000])
-      .range([1 + 2 / zoomFactor, 3 + 7.5 / zoomFactor]);
+      .domain([2, 1000])
+      .range([4 / zoomFactor, 1 + 11.5 / zoomFactor]);
   }
 
   componentDidMount() {
@@ -239,10 +239,11 @@ export class ProjectedPaths extends React.PureComponent {
               asDensity = Object.keys(asDistribution).length / p.length,
               singleProbeScale = ` scale(
                ${Math.min(1.4, 2.4 / this.props.zoomFactor)})`,
-              hexBinScale = ` scale(${Math.min(
-                1.0,
-                4 / this.props.zoomFactor
-              )})`;
+              hexBinScale = " scale(1.0)";
+            // hexBinScale = ` scale(${Math.min(
+            //   1.0,
+            //   4 / this.props.zoomFactor
+            // )})`;
             //console.log(
             //   `${Object.keys(asDistribution)}; (${p.length}) -> ${Object.keys(
             //     asDistribution
