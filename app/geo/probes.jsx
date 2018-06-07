@@ -100,32 +100,45 @@ export const transformProbesData = (probesData, projection) => {
 };
 
 const blip = keyframes`
-    from: { stroke-width: 0.2; }
-    50% { transform: scale(9.0); }
-    to { stroke-width: 0.2; }
+    from: { transform: scale(1.0) translate(0,0); }
+    50% { transform: scale(9.0) translate(0,0); }
+    to { transform: scale(1.0) translate(0,0); }
 `;
 
 const StyledProbeStatusChanger = styled.circle`
   stroke-width: 0.2;
-  //fill: ${props => (props.status === "connect" && "green") || "black"};
+  //fill: ${props => (props.status === "connect" && "#00B213") || "#FF0050"};
   fill: none;
-  stroke: ${props => (props.status === "connect" && "green") || "black"};
+  stroke: ${props => (props.status === "connect" && "#00B213") || "#FF0050"};
   animation: ${blip} 1.6s ease-in 5;
-  transform-origin: ${props => `-${props.dx / 8 }px -${props.dy / 8}px`};
 `;
 
 export class ProbeStatusChanger extends React.Component {
   render() {
     return (
-      <StyledProbeStatusChanger
+      <g
         transform={`translate(${this.props.dx},${this.props.dy})`}
-        //transformOrigin={`${this.props.dx},${this.props.dy}`}
-        r={1 / this.props.zoomFactor}
-        status={this.props.status}
-        dx={this.props.dx}
-        dy={this.props.dy}
-        vectorEffect="non-scaling-stroke"
-      />
+        style={{ transformOrigin: `${this.props.dx}px ${this.props.dy}px` }}
+      >
+        <StyledProbeStatusChanger
+          //transformOrigin={`${this.props.dx}px ${this.props.dy}px`}
+          r={1 / this.props.zoomFactor}
+          status={this.props.status}
+          dx={this.props.dx}
+          dy={this.props.dy}
+          vectorEffect="non-scaling-stroke"
+        >
+          {/* <animateTransform
+            attributeName="transform"
+            attributeType="XML"
+            type="scale"
+            from="1.0"
+            to="9.0"
+            dur="3s"
+            repeatCount="indefinite"
+          /> */}
+        </StyledProbeStatusChanger>
+      </g>
     );
   }
 }
@@ -170,7 +183,7 @@ export class ProjectedPaths extends React.PureComponent {
     // of the hexbin on screen
     this.radius = scaleSqrt()
       .domain([10, 1000])
-      .range([2, 2 + 7.5 / zoomFactor]);
+      .range([1 + 2 / zoomFactor, 3 + 7.5 / zoomFactor]);
   }
 
   componentDidMount() {
@@ -224,9 +237,11 @@ export class ProjectedPaths extends React.PureComponent {
                 return acc;
               }, {}),
               asDensity = Object.keys(asDistribution).length / p.length,
-              scale = ` scale(${Math.min(
-                (p.length > 1 && 1.0) || 2.0,
-                3 / this.props.zoomFactor
+              singleProbeScale = ` scale(
+               ${Math.min(1.4, 2.4 / this.props.zoomFactor)})`,
+              hexBinScale = ` scale(${Math.min(
+                1.0,
+                4 / this.props.zoomFactor
               )})`;
             //console.log(
             //   `${Object.keys(asDistribution)}; (${p.length}) -> ${Object.keys(
@@ -243,7 +258,10 @@ export class ProjectedPaths extends React.PureComponent {
                   "M 0,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0"
                 }
                 transform={`translate(${(p.length > 1 && p.x) ||
-                  p[0][0]},${(p.length > 1 && p.y) || p[0][1]})${scale}`}
+                  p[0][0]},${(p.length > 1 && p.y) || p[0][1]})${(p.length >
+                  1 &&
+                  hexBinScale) ||
+                  singleProbeScale}`}
                 //fill={this.color(median(p, p => +p.date))}
                 //fill={this.color(mean(p, p => +p[14]))}
                 fill={
