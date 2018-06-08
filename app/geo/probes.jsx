@@ -10,7 +10,12 @@ import styled, { keyframes } from "styled-components";
 
 import { geoRobinson as projection } from "d3-geo-projection";
 
-import { GeoMap, loadCountryGeoInfo } from "@ripe-rnd/ui-components";
+import {
+  GeoMap,
+  loadCountryGeoInfo,
+  SvgToolTip
+} from "@ripe-rnd/ui-components";
+
 import {
   ripeMagenta,
   atlasGreen,
@@ -99,6 +104,20 @@ export const transformProbesData = (probesData, projection) => {
   });
 };
 
+const calculateSimpsonIndex = p => {
+  const asDistribution = p.reduce((acc, next) => {
+    const asn = next[3] || next[4] || 0;
+    acc[asn] = (acc[asn] && acc[asn] + 1) || 1;
+    return acc;
+  }, {});
+  return Object.keys(asDistribution)
+    .filter(as => as !== "0")
+    .reduce(
+      (acc, next) => acc + Math.pow(asDistribution[next] / p.length, 2),
+      0
+    );
+};
+
 const blip = keyframes`
     from: { transform: scale(1.0) translate(0,0); }
     50% { transform: scale(9.0) translate(0,0); }
@@ -163,8 +182,8 @@ export class ProjectedPaths extends React.PureComponent {
       .interpolate(interpolateLab);
 
     this.asColor = scaleLinear()
-      .domain([0.2, 1.0])
-      .range(["#F4FFF5", "#00B213"])
+      .domain([1, 0])
+      .range(["#F4FFF5", oimEmerald])
       .interpolate(interpolateLab);
 
     this.state = {
@@ -177,7 +196,7 @@ export class ProjectedPaths extends React.PureComponent {
       .extent([[0, 0], [this.props.width, this.props.height]])
       // radius of catchment area, so probes within this radius end up
       // in one hexbin.
-      .radius(7.5 / zoomFactor);
+      .radius(8.5 / zoomFactor);
 
     // map number of probes in hexbin to the size
     // of the hexbin on screen
@@ -220,13 +239,6 @@ export class ProjectedPaths extends React.PureComponent {
   }
 
   render() {
-    window.color = this.color;
-    window.mean = mean;
-    window.median = median;
-    window.histogram = histogram;
-    console.log(
-      this.paths.reduce((acc, next) => Math.max(acc, next.length), 0)
-    );
     return (
       <g>
         {this.paths &&
@@ -236,19 +248,10 @@ export class ProjectedPaths extends React.PureComponent {
                 acc[asn] = (acc[asn] && acc[asn] + 1) || 1;
                 return acc;
               }, {}),
-              asDensity = Object.keys(asDistribution).length / p.length,
+              asDensity = calculateSimpsonIndex(p),
               singleProbeScale = ` scale(
                ${Math.min(1.4, 2.4 / this.props.zoomFactor)})`,
               hexBinScale = " scale(1.0)";
-            // hexBinScale = ` scale(${Math.min(
-            //   1.0,
-            //   4 / this.props.zoomFactor
-            // )})`;
-            //console.log(
-            //   `${Object.keys(asDistribution)}; (${p.length}) -> ${Object.keys(
-            //     asDistribution
-            //   ).length / p.length}`
-            // );
             return (
               <path
                 className="hexagon"
