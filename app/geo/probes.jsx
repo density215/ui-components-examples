@@ -115,7 +115,7 @@ const calculateSimpsonIndex = p => {
     .reduce(
       (acc, next) => acc + Math.pow(asDistribution[next] / p.length, 2),
       0
-    );
+    ).toFixed(2);
 };
 
 const blip = keyframes`
@@ -147,15 +147,6 @@ export class ProbeStatusChanger extends React.Component {
           dy={this.props.dy}
           vectorEffect="non-scaling-stroke"
         >
-          {/* <animateTransform
-            attributeName="transform"
-            attributeType="XML"
-            type="scale"
-            from="1.0"
-            to="9.0"
-            dur="3s"
-            repeatCount="indefinite"
-          /> */}
         </StyledProbeStatusChanger>
       </g>
     );
@@ -181,7 +172,7 @@ export class ProjectedPaths extends React.PureComponent {
       .range(["#FF0050", "#00B213"])
       .interpolate(interpolateLab);
 
-    this.asColor = scaleLinear()
+    this.hexbinColorRange = scaleLinear()
       .domain([1, 0])
       .range(["#F4FFF5", oimEmerald])
       .interpolate(interpolateLab);
@@ -242,19 +233,26 @@ export class ProjectedPaths extends React.PureComponent {
     return (
       <g>
         {this.paths &&
-          this.paths.map(p => {
-            const asDistribution = p.reduce((acc, next) => {
-                const asn = next[3] || next[4] || 0;
-                acc[asn] = (acc[asn] && acc[asn] + 1) || 1;
-                return acc;
-              }, {}),
-              asDensity = calculateSimpsonIndex(p),
+          this.paths.map((p, idx) => {
+            const simpsonIndex = calculateSimpsonIndex(p),
+              hexbinBodyColor = this.hexbinColorRange(simpsonIndex),
               singleProbeScale = ` scale(
                ${Math.min(1.4, 2.4 / this.props.zoomFactor)})`,
               hexBinScale = " scale(1.0)";
+
+            // debug tooltip
+            // if (idx === 0) {
+            //   this.props.showToolTip({
+            //     probes: [...p], // get rid of the weird confluence of array and object that D3 creates.
+            //     x: p.x,
+            //     y: p.y,
+            //     simpsonIndex: simpsonIndex
+            //   });
+            // }
+            // end debug 
+            
             return (
               <path
-                className="hexagon"
                 key={`h_${p.x}_${p.y}`}
                 d={
                   (p.length > 1 &&
@@ -269,14 +267,22 @@ export class ProjectedPaths extends React.PureComponent {
                 //fill={this.color(median(p, p => +p.date))}
                 //fill={this.color(mean(p, p => +p[14]))}
                 fill={
-                  ((p.length > 1 || p[0][14] !== 2) &&
-                    this.asColor(asDensity)) ||
-                  "none"
+                  ((p.length > 1 || p[0][14] !== 2) && hexbinBodyColor) ||
+                  "white"
                 }
                 stroke={this.color(mean(p, p => +p[14]))}
                 strokeWidth={
                   (p.length > 1 && this.radius(p.length) / 5) || "0.2"
                 }
+                onMouseEnter={e =>
+                  this.props.showToolTip({
+                    probes: [...p], // get rid of the weird confluence of array and object that D3 creates.
+                    x: p.x,
+                    y: p.y,
+                    simpsonIndex: simpsonIndex
+                  })
+                }
+                onMouseLeave={e => this.props.hideToolTip()}
               />
             );
           })}
@@ -295,6 +301,39 @@ export class ProbesHexbinMap extends React.Component {
       webWorkerAvailability: true
     };
   }
+
+  showToolTip = d => {
+    const fontSize = 12,
+      lineHeight = fontSize + 2,
+      marginHor = 1.2 * fontSize,
+      dx = 3.5 + 1.5 * marginHor,
+      dy = 6 * lineHeight + 2 * marginHor;
+    console.log(d);
+    this.setState({
+      tooltip: (
+        <SvgToolTip
+          header={"PROBES"}
+          x={d.x}
+          y={d.y}
+          dx={dx}
+          dy={0}
+          fontsize={fontSize}
+          minwidth={100}
+          zoomFactor={this.props.zoomFactor}
+          textlines={[
+            `number of probes: ${d.probes.length}`,
+            `simpson index: ${d.simpsonIndex}`
+          ]}
+        />
+      )
+    });
+  };
+
+  hideToolTip = (d, i) => {
+    this.setState({
+      tooltip: null
+    });
+  };
 
   componentDidMount() {
     const countries = loadCountryGeoInfo().then(
@@ -386,12 +425,15 @@ export class ProbesHexbinMap extends React.Component {
           paths={this.state.probes}
           width={this.props.width}
           height={this.props.height}
+          showToolTip={this.showToolTip}
+          hideToolTip={this.hideToolTip}
         />
 
         {this.state.changedProbes.length > 0 &&
           this.state.changedProbes.map(ps => (
             <ProbeStatusChanger dx={ps.dx} dy={ps.dy} status={ps.status} />
           ))}
+        {this.state.tooltip}
       </GeoMap>
     );
   }
