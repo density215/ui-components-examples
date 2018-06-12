@@ -13,7 +13,8 @@ import { geoRobinson as projection } from "d3-geo-projection";
 import {
   GeoMap,
   loadCountryGeoInfo,
-  SvgToolTip
+  SvgToolTip,
+  ThumbBar
 } from "@ripe-rnd/ui-components";
 
 import {
@@ -55,11 +56,11 @@ export const loadProbesInfo = async ({ ...props }) => {
   * 
   * output format:
   *  [
-  *     d3X, d3Y, ...rest of the input array
+  *     d3X, d3Y, ...rest of the input array (so all the indexes + 2)
   *  ]
   */
 
-  const fetchUrl = "https://atlas-ui1.atlas.ripe.net/api/v2/probes/all";
+  const fetchUrl = "https://atlas.ripe.net/api/v2/probes/all";
 
   let response = await fetch(fetchUrl).catch(err => {
     console.log(err);
@@ -106,16 +107,28 @@ export const transformProbesData = (probesData, projection) => {
 
 const calculateSimpsonIndex = p => {
   const asDistribution = p.reduce((acc, next) => {
-    const asn = next[3] || next[4] || 0;
-    acc[asn] = (acc[asn] && acc[asn] + 1) || 1;
+    const asn = next[3] || next[4] || 0,
+      status = (next[14] === 1 && "c") || "d";
+    acc[asn] = {
+      ...acc[asn],
+      [status]: (acc[asn] && acc[asn][status] && acc[asn][status] + 1) || 1,
+      t: (acc[asn] && acc[asn].t && acc[asn].t + 1) || 1
+    };
     return acc;
   }, {});
-  return Object.keys(asDistribution)
-    .filter(as => as !== "0")
-    .reduce(
-      (acc, next) => acc + Math.pow(asDistribution[next] / p.length, 2),
-      0
-    ).toFixed(2);
+
+  return [
+    Object.keys(asDistribution)
+      .filter(as => as !== "0")
+      .reduce(
+        (acc, next) => acc + Math.pow(asDistribution[next].t / p.length, 2),
+        0
+      )
+      .toFixed(2),
+    Object.entries(asDistribution)
+      .reduce((ac, next) => [...ac, { as: next[0], count: next[1] }], [])
+      .sort((a, b) => b.count.t - a.count.t)
+  ];
 };
 
 const blip = keyframes`
@@ -146,8 +159,7 @@ export class ProbeStatusChanger extends React.Component {
           dx={this.props.dx}
           dy={this.props.dy}
           vectorEffect="non-scaling-stroke"
-        >
-        </StyledProbeStatusChanger>
+        />
       </g>
     );
   }
@@ -220,7 +232,6 @@ export class ProjectedPaths extends React.PureComponent {
     }
 
     if (nextProps.zoomFactor !== this.props.zoomFactor) {
-      console.log("zoomert on paths");
       console.log(`zoomFactor : ${nextProps.zoomFactor}`);
       this.calculateHexBin(nextProps.zoomFactor);
       this.paths = this.hexbin(
@@ -230,15 +241,19 @@ export class ProjectedPaths extends React.PureComponent {
   }
 
   render() {
+    let largestBarValue;
     return (
       <g>
         {this.paths &&
           this.paths.map((p, idx) => {
-            const simpsonIndex = calculateSimpsonIndex(p),
+            const [simpsonIndex, asDistribution] = calculateSimpsonIndex(p),
               hexbinBodyColor = this.hexbinColorRange(simpsonIndex),
               singleProbeScale = ` scale(
                ${Math.min(1.4, 2.4 / this.props.zoomFactor)})`,
               hexBinScale = " scale(1.0)";
+
+            largestBarValue =
+              (idx === 0 && asDistribution[0].count.t) || largestBarValue;
 
             // debug tooltip
             // if (idx === 0) {
@@ -249,8 +264,8 @@ export class ProjectedPaths extends React.PureComponent {
             //     simpsonIndex: simpsonIndex
             //   });
             // }
-            // end debug 
-            
+            // end debug
+
             return (
               <path
                 key={`h_${p.x}_${p.y}`}
@@ -279,7 +294,9 @@ export class ProjectedPaths extends React.PureComponent {
                     probes: [...p], // get rid of the weird confluence of array and object that D3 creates.
                     x: p.x,
                     y: p.y,
-                    simpsonIndex: simpsonIndex
+                    simpsonIndex: simpsonIndex,
+                    largestBarValue: largestBarValue,
+                    asDistribution: asDistribution.slice(0, 10)
                   })
                 }
                 onMouseLeave={e => this.props.hideToolTip()}
@@ -307,7 +324,7 @@ export class ProbesHexbinMap extends React.Component {
       lineHeight = fontSize + 2,
       marginHor = 1.2 * fontSize,
       dx = 3.5 + 1.5 * marginHor,
-      dy = 6 * lineHeight + 2 * marginHor;
+      dy = 6 * lineHeight;
     console.log(d);
     this.setState({
       tooltip: (
@@ -319,12 +336,27 @@ export class ProbesHexbinMap extends React.Component {
           dy={0}
           fontsize={fontSize}
           minwidth={100}
+          extraHeight={180 + marginHor}
           zoomFactor={this.props.zoomFactor}
           textlines={[
-            `number of probes: ${d.probes.length}`,
-            `simpson index: ${d.simpsonIndex}`
+            `connected : ${d.probes.filter(p => p[14] === 1).length}`,
+            `disconnected : ${d.probes.filter(p => p[14] === 2).length}`,
+            `AS diversity : ${d.simpsonIndex}`
           ]}
-        />
+        >
+          <ThumbBar
+            dy={dy}
+            bars={d.asDistribution}
+            height={150}
+            width={160 + marginHor}
+            margin={marginHor}
+            largestBarValue={d.largestBarValue}
+            countAttributes={[
+              { attr: "t", color: "#FF0050" },
+              { attr: "c", color: "#00B213" }
+            ]}
+          />
+        </SvgToolTip>
       )
     });
   };
