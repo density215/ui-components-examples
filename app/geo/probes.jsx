@@ -105,10 +105,13 @@ export const transformProbesData = (probesData, projection) => {
   });
 };
 
-const calculateSimpsonIndex = p => {
+const calculateSimpsonIndex = (p, largestBarValue) => {
   const asDistribution = p.reduce((acc, next) => {
     const asn = next[3] || next[4] || 0,
-      status = (next[14] === 1 && "c") || "d";
+      status = (next[14] === 1 && "c") || "d",
+      pCount = acc[asn] && acc[asn][status] && acc[asn][status] + 1;
+
+    largestBarValue = (pCount > largestBarValue && pCount) || largestBarValue;
     acc[asn] = {
       ...acc[asn],
       [status]: (acc[asn] && acc[asn][status] && acc[asn][status] + 1) || 1,
@@ -127,7 +130,8 @@ const calculateSimpsonIndex = p => {
       .toFixed(2),
     Object.entries(asDistribution)
       .reduce((ac, next) => [...ac, { as: next[0], count: next[1] }], [])
-      .sort((a, b) => b.count.t - a.count.t)
+      .sort((a, b) => b.count.t - a.count.t),
+    largestBarValue
   ];
 };
 
@@ -246,15 +250,18 @@ export class ProjectedPaths extends React.PureComponent {
       <g>
         {this.paths &&
           this.paths.map((p, idx) => {
-            const [simpsonIndex, asDistribution] = calculateSimpsonIndex(p),
+            const [simpsonIndex, asDistribution, _] = calculateSimpsonIndex(
+                p,
+                0
+              ),
               hexbinBodyColor = this.hexbinColorRange(simpsonIndex),
               singleProbeScale = ` scale(
                ${Math.min(1.4, 2.4 / this.props.zoomFactor)})`,
               hexBinScale = " scale(1.0)";
 
+            //largestBarValue = Math.max(...asDistribution.map(a => a.count.t));
             largestBarValue =
               (idx === 0 && asDistribution[0].count.t) || largestBarValue;
-
             // debug tooltip
             // if (idx === 0) {
             //   this.props.showToolTip({
@@ -295,7 +302,7 @@ export class ProjectedPaths extends React.PureComponent {
                     x: p.x,
                     y: p.y,
                     simpsonIndex: simpsonIndex,
-                    largestBarValue: largestBarValue,
+                    largestBarValue: largestBarValue * 1.4, // stupid estimate, but I don't want to go over all bins to see which one has the biggest AS
                     asDistribution: asDistribution.slice(0, 10)
                   })
                 }
@@ -347,7 +354,7 @@ export class ProbesHexbinMap extends React.Component {
           <ThumbBar
             dy={dy}
             bars={d.asDistribution}
-            height={150}
+            height={100}
             width={160 + marginHor}
             margin={marginHor}
             largestBarValue={d.largestBarValue}
