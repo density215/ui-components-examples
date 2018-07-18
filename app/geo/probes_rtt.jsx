@@ -29,6 +29,9 @@ import {
   lColor
 } from "@ripe-rnd/ui-components";
 
+const url_as_frag = window.location.pathname.match(/\/as\/(\d+)/),
+  asn = url_as_frag && url_as_frag[1];
+
 export const loadProbesInfo = async ({ ...props }) => {
   /* django doesn't get any faster than this.
   * The super-secret undocumented /probes/all call.
@@ -94,8 +97,7 @@ export const loadNewProbeInfo = async prb_id => {
 };
 
 export const loadRttForProbesData = async () => {
-  const fetchUrl =
-    "https://sg-pub.ripe.net/emile/ixp-country-jedi/history/3356.json";
+  const fetchUrl = `https://sg-pub.ripe.net/emile/min-rtt/${asn}.json`;
 
   let response = await fetch(fetchUrl).catch(err => {
     console.log(err);
@@ -154,7 +156,10 @@ const calculateSimpsonIndex = (p, largestBarValue) => {
 };
 
 const calculateMinRttValue = p => {
-  const v =  p.reduce((acc, next) => (next[16] < acc && next[16]) || acc, Infinity);
+  const v = p.reduce(
+    (acc, next) => (next[16] < acc && next[16]) || acc,
+    Infinity
+  );
   return v;
 };
 
@@ -433,7 +438,7 @@ export class ProbesHexbinMap extends React.Component {
 
         // initialize probeUpdates webworker
         if (window.Worker) {
-          const probeUpdater = new Worker("./worker.js");
+          const probeUpdater = new Worker("/worker.js");
           probeUpdater.onmessage = m => {
             const newProbeStatus = JSON.parse(m.data);
             let thisProbe = probesData.find(
