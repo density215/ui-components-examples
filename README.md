@@ -11,13 +11,13 @@ To do so:
 
 - You'll need node.js installed to make this work. Go to https://nodejs.org/en/download/package-manager/ to see an overview of options for all OSes. I greatly prefer using nodesource.com for linux distros. For MacOS I prefer using the bash install script instead of homebrew, but YMMV.
 - Clone this repo somewhere on you local machine with `git@github.com:density215/ui-components-examples.git`
-- Go into the eyeballsgraph directory: `cd ui-components-examples`
+- Go into the ui-components-examples directory: `cd ui-components-examples`
 - Install all dependencies with: `npm install`
 - Right now we don't have a (public) npm package for one dependency, the @ripe-rnd/ui-components library. You'll have to link this manually like this:
   - Clone the ui-components library `git clone git@github.com:RIPE-NCC/rnd-ui-components.git` in a directory of your liking.
   - Go into the root of the library with `cd ui-components`
   - Make a linked local package out of this repo with `npm link`
-  - Now go (back) into the `template/eyeballsgraph/` diretory of the ixp-country-jedi repo and install the linked package with `npm link @ripe-rnd/ui-components`.
+  - Now go (back) to the root of the directory where you cloned the ui-components-examples repo and install the linked package with `npm link @ripe-rnd/ui-components`.
 - Now you can start the dev server with `npm start` and go with you favourite web-browser to `localhost:4042`
 
 In the future we will have a npm package of the @ripe-rnd/ui-components and the link steps will go away.
