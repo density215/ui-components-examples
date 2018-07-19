@@ -64,7 +64,7 @@ export const loadProbesInfo = async ({ ...props }) => {
   *  ]
   */
 
-  const fetchUrl = "https://atlas-ui1.atlas.ripe.net/api/v2/probes/all";
+  const fetchUrl = "https://atlas.ripe.net/api/v2/probes/all";
 
   let response = await fetch(fetchUrl).catch(err => {
     console.log(err);
