@@ -91,7 +91,7 @@ module.exports = {
       rewrites: [
         { from: /bundle\.js/, to: "/bundle.js" },
         { from: /index\.html/, to: "/index.html" },
-        { from: /measurements\/[0-9]+/, to: "/index.html" }
+        { from: /as\/[0-9]+/, to: "/index.html" }
       ]
     }
   },
