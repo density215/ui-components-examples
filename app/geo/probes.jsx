@@ -9,6 +9,7 @@ import { interpolateLab } from "d3-interpolate";
 import styled, { keyframes } from "styled-components";
 
 import { geoRobinson as projection } from "d3-geo-projection";
+//import { geoCylindricalStereographic as projection } from "d3-geo-projection";
 
 import {
   GeoMap,
@@ -60,7 +61,7 @@ export const loadProbesInfo = async ({ ...props }) => {
   *  ]
   */
 
-  const fetchUrl = "https://atlas.ripe.net/api/v2/probes/all";
+  const fetchUrl = "https://atlas-ui1.atlas.ripe.net/api/v2/probes/all";
 
   let response = await fetch(fetchUrl).catch(err => {
     console.log(err);
@@ -78,7 +79,7 @@ export const loadProbesInfo = async ({ ...props }) => {
 };
 
 export const loadNewProbeInfo = async prb_id => {
-  const fetchUrl = `https://atlas.ripen.net/api/v2/${prb_id}`;
+  const fetchUrl = `https://atlas.ripe.net/api/v2/${prb_id}`;
   let reponse = await fetch(fetchUrl).catch(err => {
     console.log(err);
     console.log(`${fetchUrl} does not exist.`);
@@ -235,7 +236,10 @@ export class ProjectedPaths extends React.PureComponent {
       this.setState({ pathsInitialized: true });
     }
 
-    if (nextProps.zoomFactor !== this.props.zoomFactor) {
+    if (
+      nextProps.zoomFactor !== this.props.zoomFactor ||
+      nextProps.probeChangedEvents !== this.props.probeChangedEvents
+    ) {
       console.log(`zoomFactor : ${nextProps.zoomFactor}`);
       this.calculateHexBin(nextProps.zoomFactor);
       this.paths = this.hexbin(
@@ -302,8 +306,10 @@ export class ProjectedPaths extends React.PureComponent {
                     x: p.x,
                     y: p.y,
                     simpsonIndex: simpsonIndex,
-                    largestBarValue: largestBarValue * 1.4, // stupid estimate, but I don't want to go over all bins to see which one has the biggest AS
-                    asDistribution: asDistribution.slice(0, 10)
+                    largestBarValue: Math.max(largestBarValue * 1.0), // stupid estimate, but I don't want to go over all bins to see which one has the biggest AS
+                    //minwidth: 7000,
+                    asDistribution: asDistribution.slice(0, 10),
+                    moreNumber: asDistribution.slice(11).length
                   })
                 }
                 onMouseLeave={e => this.props.hideToolTip()}
@@ -332,7 +338,6 @@ export class ProbesHexbinMap extends React.Component {
       marginHor = 1.2 * fontSize,
       dx = 3.5 + 1.5 * marginHor,
       dy = 6 * lineHeight;
-    console.log(d);
     this.setState({
       tooltip: (
         <SvgToolTip
@@ -342,8 +347,8 @@ export class ProbesHexbinMap extends React.Component {
           dx={dx}
           dy={0}
           fontsize={fontSize}
-          minwidth={100}
-          extraHeight={180 + marginHor}
+          minwidth={165}
+          extraHeight={180 + marginHor + ((d.moreNumber && 10) || 0)}
           zoomFactor={this.props.zoomFactor}
           textlines={[
             `connected : ${d.probes.filter(p => p[14] === 1).length}`,
@@ -358,11 +363,17 @@ export class ProbesHexbinMap extends React.Component {
             width={160 + marginHor}
             margin={marginHor}
             largestBarValue={d.largestBarValue}
+            minBarHeight={1 / this.props.zoomFactor}
             countAttributes={[
               { attr: "t", color: "#FF0050" },
               { attr: "c", color: "#00B213" }
             ]}
           />
+          {d.moreNumber && (
+            <text transform={`translate(${marginHor}  274)`}>
+              and {d.moreNumber} more...
+            </text>
+          )}
         </SvgToolTip>
       )
     });
@@ -395,15 +406,11 @@ export class ProbesHexbinMap extends React.Component {
         if (window.Worker) {
           const probeUpdater = new Worker("./worker.js");
           probeUpdater.onmessage = m => {
-            console.log(m.data);
-            console.log(probesData[0][3]);
             const newProbeStatus = JSON.parse(m.data);
             let thisProbe = probesData.find(
               p => p[2] === newProbeStatus.prb_id
             );
 
-            console.log(newProbeStatus);
-            console.log(thisProbe);
             if (!thisProbe) {
               thisProbe = loadNewProbeInfo(newProbeStatus.prb_id).then(d => {
                 const coords = this.props.projection([
@@ -418,6 +425,22 @@ export class ProbesHexbinMap extends React.Component {
               });
               console.log("new probe online!");
             } else {
+              const updatedProbeIndex = this.state.probes.findIndex(
+                p => p[2] === thisProbe[2]
+              );
+              thisProbe[14] =
+                (newProbeStatus.event === "connect" && 1) ||
+                (newProbeStatus.event === "disconnect" && 2) ||
+                null;
+
+              console.log("----------");
+              console.log("new probe status");
+              console.log(`prb_id: ${thisProbe[2]}`);
+              console.log(`asn (v4) : ${thisProbe[3]}`);
+              console.log(`asn (v6) : ${thisProbe[4]}`);
+              console.log(`status: ${newProbeStatus.event}`);
+              console.log("----------");
+
               this.setState({
                 changedProbes: [
                   ...this.state.changedProbes,
@@ -425,10 +448,25 @@ export class ProbesHexbinMap extends React.Component {
                     prb_id: thisProbe[2],
                     status: newProbeStatus.event,
                     dx: thisProbe[0],
-                    dy: thisProbe[1]
+                    dy: thisProbe[1],
+                    eventCount:
+                      this.state.changedProbes.filter(
+                        p => (p.prb_id = thisProbe[2])
+                      ).length + 1
                   }
                 ]
               });
+
+              if (updatedProbeIndex > -1) {
+                window.probes = this.state.probes;
+                this.setState({
+                  probes: [
+                    ...this.state.probes.slice(0, updatedProbeIndex),
+                    thisProbe,
+                    ...this.state.probes.slice(updatedProbeIndex + 1)
+                  ]
+                });
+              }
             }
           };
         } else {
@@ -462,6 +500,7 @@ export class ProbesHexbinMap extends React.Component {
       >
         <ProjectedPaths
           paths={this.state.probes}
+          probeChangedEvents={this.state.changedProbes.length}
           width={this.props.width}
           height={this.props.height}
           showToolTip={this.showToolTip}
@@ -470,7 +509,12 @@ export class ProbesHexbinMap extends React.Component {
 
         {this.state.changedProbes.length > 0 &&
           this.state.changedProbes.map(ps => (
-            <ProbeStatusChanger dx={ps.dx} dy={ps.dy} status={ps.status} />
+            <ProbeStatusChanger
+              //key={`ps_${ps.prb_id}_${ps.status}`}
+              dx={ps.dx}
+              dy={ps.dy}
+              status={ps.status}
+            />
           ))}
         {this.state.tooltip}
       </GeoMap>
