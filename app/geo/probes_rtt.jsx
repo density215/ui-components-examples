@@ -114,6 +114,9 @@ export const loadRttForProbesData = async () => {
 
 export const transformProbesData = (probesData, projection) => {
   return probesData.map(d => {
+    if (!d[9] || (!d[9] && d)) {
+      console.log(d);
+    }
     const p = projection([d[9], d[8]]);
     //d[14] = d.slice(0, 1)[0];
     //d.prb_id = d.slice(0,1); // copy first element, otherwise D3 will f*ck your
@@ -429,10 +432,16 @@ export class ProbesHexbinMap extends React.Component {
 
         loadRttForProbesData().then(rttData => {
           let count = 0;
-          const probes = rttData.map(rttP => {
-            const prb_id = probesData.find(p => p[2] === rttP.prb_id);
-            return [...prb_id, (prb_id && rttP.min_rtt) || null];
-          });
+          const probes = rttData
+            .map(rttP => {
+              const prb_id = probesData.find(p => p[2] === rttP.prb_id);
+              // kick out probes that are now abandoned according to /all
+              if (!prb_id) {
+                return null;
+              }
+              return [...prb_id, (prb_id && rttP.min_rtt) || null];
+            })
+            .filter(p => p);
           this.setState({ probes: probes });
         });
 
@@ -459,9 +468,9 @@ export class ProbesHexbinMap extends React.Component {
               });
               console.log("new probe online!");
             } else {
-              const updatedProbeIndex = this.state.probes.findIndex(
-                p => p[2] === thisProbe[2]
-              );
+              const updatedProbeIndex =
+                this.state.probes &&
+                this.state.probes.findIndex(p => p[2] === thisProbe[2]);
               thisProbe[14] =
                 (newProbeStatus.event === "connect" && 1) ||
                 (newProbeStatus.event === "disconnect" && 2) ||
