@@ -15,7 +15,8 @@ var dir_geo = path.resolve(
 console.log(path.resolve(__dirname));
 module.exports = {
   entry: [
-    "babel-polyfill",
+    // "babel-polyfill",
+    "core-js",
     "react-hot-loader/patch",
     "webpack/hot/only-dev-server",
     path.resolve(dir_app, "index.js") //,
