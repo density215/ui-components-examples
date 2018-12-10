@@ -8,7 +8,7 @@ import { scaleSqrt, scaleTime, scaleLinear } from "d3-scale";
 import { interpolateLab } from "d3-interpolate";
 import styled, { keyframes } from "styled-components";
 
-import { geoRobinson as projection } from "d3-geo-projection";
+import { geoEqualEarth as projection } from "d3-geo";
 
 import {
   GeoMap,
@@ -28,72 +28,17 @@ import {
   lColor
 } from "@ripe-rnd/ui-components";
 
-export const loadProbesInfo = async ({ ...props }) => {
-  /* django doesn't get any faster than this.
-  * The super-secret undocumented /probes/all call.
-  * 
-  * input format:
-  *  [
-  *   0           probe.pk,
-  *   1           probe.asn_v4 if probe.asn_v4 else 0,
-  *   2           probe.asn_v6 if probe.asn_v6 else 0,
-  *   3           probe.prb_country_code.code,
-  *   4           1 if probe.is_anchor else 0,
-  *   5           1 if probe.prb_public else 0,
-  *   6          lat,
-  *   7          lng,
-  *   8           probe.prefix_v4 if probe.prefix_v4 else 0,
-  *   9           probe.prefix_v6 if probe.prefix_v6 else 0,
-  *   10          probe.address_v4 if probe.prb_public and probe.address_v4 else 0,
-  *   11           probe.address_v6 if probe.prb_public and probe.address_v6 else 0,
-  *   12          probe.status,
-  *   13         int(probe.status_since.strftime("%s")) if probe.status_since is not None else None
-  *  ]
-  * 
-  * Now, no matter what you try, d3 will want to use the first to elements in this array MUTABLY
-  * for its x,y coordinates. So we're outputting the array from index 2, thereby reserving for 0,1
-  * for d3 weirdness.
-  * 
-  * output format:
-  *  [
-  *     d3X, d3Y, ...rest of the input array (so all the indexes + 2)
-  *  ]
-  */
-
-  const fetchUrl = "https://atlas.ripe.net/api/v2/probes/all";
-
-  let response = await fetch(fetchUrl).catch(err => {
-    console.log(err);
-    console.log(`${fetchUrl} does not exist.`);
-  });
-  let probesData = await response.json().catch(error => {
-    console.log("error loading geographic information (topojson)");
-    console.log(error);
-    return null;
-  });
-  // yes, there are probes with location NULL, so kick those out.
-  return probesData.probes
-    .filter(p => p[6] && p[7])
-    .map(p => [null, null, ...p]);
-};
-
-export const loadNewProbeInfo = async prb_id => {
-  const fetchUrl = `https://atlas.ripen.net/api/v2/${prb_id}`;
-  let reponse = await fetch(fetchUrl).catch(err => {
-    console.log(err);
-    console.log(`${fetchUrl} does not exist.`);
-  });
-  let probeData = await response.json().catch(error => {
-    console.log("error loading probe info from atlas");
-    console.log(error);
-    return null;
-  });
-  // return empty if there's no geolocation data
-  return (probeData.geometry && probeData) || {};
-};
+import {
+  loadProbesInfo,
+  loadNewProbeInfo
+  // transformProbesData
+} from "../adapters";
 
 export const transformProbesData = (probesData, projection) => {
   return probesData.map(d => {
+    if (!d[9] || (!d[9] && d)) {
+      console.log(d);
+    }
     const p = projection([d[9], d[8]]);
     //d[14] = d.slice(0, 1)[0];
     //d.prb_id = d.slice(0,1); // copy first element, otherwise D3 will f*ck your
@@ -169,7 +114,7 @@ export class ProbeStatusChanger extends React.Component {
   }
 }
 
-export class ProjectedPaths extends React.PureComponent {
+export class ProjectedPaths extends React.Component {
   constructor(props) {
     super(props);
     this.paths = [];
@@ -235,7 +180,10 @@ export class ProjectedPaths extends React.PureComponent {
       this.setState({ pathsInitialized: true });
     }
 
-    if (nextProps.zoomFactor !== this.props.zoomFactor) {
+    if (
+      nextProps.zoomFactor !== this.props.zoomFactor ||
+      nextProps.probeChangedEvents !== this.props.probeChangedEvents
+    ) {
       console.log(`zoomFactor : ${nextProps.zoomFactor}`);
       this.calculateHexBin(nextProps.zoomFactor);
       this.paths = this.hexbin(
@@ -303,7 +251,8 @@ export class ProjectedPaths extends React.PureComponent {
                     y: p.y,
                     simpsonIndex: simpsonIndex,
                     largestBarValue: largestBarValue * 1.4, // stupid estimate, but I don't want to go over all bins to see which one has the biggest AS
-                    asDistribution: asDistribution.slice(0, 10)
+                    asDistribution: asDistribution.slice(0, 10),
+                    moreNumber: asDistribution.slice(11).length
                   })
                 }
                 onMouseLeave={e => this.props.hideToolTip()}
@@ -321,7 +270,8 @@ export class ProbesHexbinMap extends React.Component {
     this.state = {
       probes: null,
       countries: null,
-      changedProbes: [],
+      changedProbes: [], // these are all the new probe events from DOM ready
+      lightProbes: [], // these are the most recent probe that need to be lighted
       webWorkerAvailability: true
     };
   }
@@ -332,7 +282,6 @@ export class ProbesHexbinMap extends React.Component {
       marginHor = 1.2 * fontSize,
       dx = 3.5 + 1.5 * marginHor,
       dy = 6 * lineHeight;
-    console.log(d);
     this.setState({
       tooltip: (
         <SvgToolTip
@@ -342,8 +291,8 @@ export class ProbesHexbinMap extends React.Component {
           dx={dx}
           dy={0}
           fontsize={fontSize}
-          minwidth={100}
-          extraHeight={180 + marginHor}
+          minwidth={165}
+          extraHeight={180 + marginHor + ((d.moreNumber && 10) || 0)}
           zoomFactor={this.props.zoomFactor}
           textlines={[
             `connected : ${d.probes.filter(p => p[14] === 1).length}`,
@@ -358,11 +307,17 @@ export class ProbesHexbinMap extends React.Component {
             width={160 + marginHor}
             margin={marginHor}
             largestBarValue={d.largestBarValue}
+            minBarHeight={1 / this.props.zoomFactor}
             countAttributes={[
               { attr: "t", color: "#FF0050" },
               { attr: "c", color: "#00B213" }
             ]}
           />
+          {d.moreNumber && (
+            <text transform={`translate(${marginHor}  274)`}>
+              and {d.moreNumber} more...
+            </text>
+          )}
         </SvgToolTip>
       )
     });
@@ -393,17 +348,13 @@ export class ProbesHexbinMap extends React.Component {
 
         // initialize probeUpdates webworker
         if (window.Worker) {
-          const probeUpdater = new Worker("./worker.js");
+          const probeUpdater = new Worker("/worker.js");
           probeUpdater.onmessage = m => {
-            console.log(m.data);
-            console.log(probesData[0][3]);
             const newProbeStatus = JSON.parse(m.data);
             let thisProbe = probesData.find(
               p => p[2] === newProbeStatus.prb_id
             );
 
-            console.log(newProbeStatus);
-            console.log(thisProbe);
             if (!thisProbe) {
               thisProbe = loadNewProbeInfo(newProbeStatus.prb_id).then(d => {
                 const coords = this.props.projection([
@@ -418,9 +369,37 @@ export class ProbesHexbinMap extends React.Component {
               });
               console.log("new probe online!");
             } else {
+              const updatedProbeIndex =
+                this.state.probes &&
+                this.state.probes.findIndex(p => p[2] === thisProbe[2]);
+              thisProbe[14] =
+                (newProbeStatus.event === "connect" && 1) ||
+                (newProbeStatus.event === "disconnect" && 2) ||
+                null;
+
+              console.log("----------");
+              console.log("new probe status");
+              console.log(`prb_id: ${thisProbe[2]}`);
+              console.log(`asn (v4) : ${thisProbe[3]}`);
+              console.log(`asn (v6) : ${thisProbe[4]}`);
+              console.log(`status: ${newProbeStatus.event}`);
+              console.log("----------");
+
               this.setState({
                 changedProbes: [
                   ...this.state.changedProbes,
+                  {
+                    prb_id: thisProbe[2],
+                    status: newProbeStatus.event,
+                    dx: thisProbe[0],
+                    dy: thisProbe[1],
+                    eventCount:
+                      this.state.changedProbes.filter(
+                        p => (p.prb_id = thisProbe[2])
+                      ).length + 1
+                  }
+                ],
+                lightProbes: [
                   {
                     prb_id: thisProbe[2],
                     status: newProbeStatus.event,
@@ -429,6 +408,17 @@ export class ProbesHexbinMap extends React.Component {
                   }
                 ]
               });
+
+              if (updatedProbeIndex > -1) {
+                window.probes = this.state.probes;
+                this.setState({
+                  probes: [
+                    ...this.state.probes.slice(0, updatedProbeIndex),
+                    thisProbe,
+                    ...this.state.probes.slice(updatedProbeIndex + 1)
+                  ]
+                });
+              }
             }
           };
         } else {
@@ -462,6 +452,7 @@ export class ProbesHexbinMap extends React.Component {
       >
         <ProjectedPaths
           paths={this.state.probes}
+          probeChangedEvents={this.state.changedProbes.length}
           width={this.props.width}
           height={this.props.height}
           showToolTip={this.showToolTip}
@@ -469,8 +460,13 @@ export class ProbesHexbinMap extends React.Component {
         />
 
         {this.state.changedProbes.length > 0 &&
-          this.state.changedProbes.map(ps => (
-            <ProbeStatusChanger dx={ps.dx} dy={ps.dy} status={ps.status} />
+          this.state.lightProbes.map((ps, i) => (
+            <ProbeStatusChanger
+              key={`ps_${ps.prb_id}_${ps.status}_${i}`}
+              dx={ps.dx}
+              dy={ps.dy}
+              status={ps.status}
+            />
           ))}
         {this.state.tooltip}
       </GeoMap>
