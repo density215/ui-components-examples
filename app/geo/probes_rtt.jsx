@@ -25,54 +25,19 @@ import {
   // transformProbesData
 } from "../adapters";
 
+import {
+  ripeMagenta,
+  atlasGreen,
+  oimCarrot,
+  oimClouds,
+  oimLand,
+  oimEmerald,
+  oimAntracite,
+  lColor
+} from "@ripe-rnd/ui-components";
+
 const url_as_frag = window.location.pathname.match(/\/as\/(\d+)/),
   asn = url_as_frag && url_as_frag[1];
-
-export const transformProbesData = (probesData, projection) => {
-  return probesData.map(d => {
-    if (!d[9] || (!d[9] && d)) {
-      console.log(d);
-    }
-    const p = projection([d[9], d[8]]);
-    //d[14] = d.slice(0, 1)[0];
-    //d.prb_id = d.slice(0,1); // copy first element, otherwise D3 will f*ck your
-    //(d[0] = p[0]), (d[1] = p[1]);
-    [d[0], d[1]] = p.slice(0, 2);
-    d.date = timeParse("%s")(d[15]);
-    //d.unshift(p[0], p[1]);
-    return d;
-  });
-};
-
-const calculateSimpsonIndex = (p, largestBarValue) => {
-  const asDistribution = p.reduce((acc, next) => {
-    const asn = next[3] || next[4] || 0,
-      status = (next[14] === 1 && "c") || "d",
-      pCount = acc[asn] && acc[asn][status] && acc[asn][status] + 1;
-
-    largestBarValue = (pCount > largestBarValue && pCount) || largestBarValue;
-    acc[asn] = {
-      ...acc[asn],
-      [status]: (acc[asn] && acc[asn][status] && acc[asn][status] + 1) || 1,
-      t: (acc[asn] && acc[asn].t && acc[asn].t + 1) || 1
-    };
-    return acc;
-  }, {});
-
-  return [
-    Object.keys(asDistribution)
-      .filter(as => as !== "0")
-      .reduce(
-        (acc, next) => acc + Math.pow(asDistribution[next].t / p.length, 2),
-        0
-      )
-      .toFixed(2),
-    Object.entries(asDistribution)
-      .reduce((ac, next) => [...ac, { as: next[0], count: next[1] }], [])
-      .sort((a, b) => b.count.t - a.count.t),
-    largestBarValue
-  ];
-};
 
 const calculateMinRttValue = p => {
   const v = p.reduce(
@@ -116,163 +81,14 @@ export class ProbeStatusChanger extends React.Component {
   }
 }
 
-// export class ProjectedPaths extends React.PureComponent {
-//   constructor(props) {
-//     super(props);
-//     this.paths = [];
-
-//     this.calculateHexBin();
-
-//     // this.color = scaleTime()
-//     //   .domain([
-//     //     timeParse("%s")((Date.now() / 1000).toFixed(0) - 86400),
-//     //     timeParse("%s")((Date.now() / 1000).toFixed(0) - 864000)
-//     //   ])
-//     //   .range(["black", "green"])
-//     //   .interpolate(interpolateLab);
-
-//     // this.color = scaleLinear()
-//     //   .domain([400, 10])
-//     //   .range(["#FF0050", "#00B213"])
-//     //   .interpolate(interpolateLab);
-
-//     // this.hexbinColorRange = scaleLinear()
-//     //   .domain([50, 10, 0])
-//     //   .range(["#FF0050", "yellow", "#00B213"])
-//     //   .interpolate(interpolateLab);
-
-//     this.state = {
-//       pathsInitialized: false
-//     };
-//   }
-
-//   calculateHexBin(zoomFactor = 1) {
-//     this.hexbin = hexbin()
-//       .extent([[0, 0], [this.props.width, this.props.height]])
-//       // radius of catchment area, so probes within this radius end up
-//       // in one hexbin.
-//       .radius(8.5 / zoomFactor);
-
-//     // map number of probes in hexbin to the size
-//     // of the hexbin on screen
-//     this.radius = scaleSqrt()
-//       .domain([2, 1000])
-//       .range([4 / zoomFactor, 1 + 11.5 / zoomFactor]);
-//   }
-
-//   componentDidMount() {
-//     if (this.props.paths) {
-//       console.log("Awas! fast paths loading!");
-
-//       this.paths = hexbin(
-//         transformProbesData(this.props.paths, this.props.projection)
-//       ).sort((a, b) => b.length - a.length);
-
-//       //this.renderD3Paths({ update: false });
-//     }
-
-//     this.setState({ pathsInitialized: true });
-//   }
-
-//   componentWillReceiveProps(nextProps) {
-//     if (nextProps.paths && !this.props.paths) {
-//       console.log("paths received");
-//       this.paths = this.hexbin(
-//         transformProbesData(nextProps.paths, this.props.projection)
-//       ).sort((a, b) => b.length - a.length);
-//       this.setState({ pathsInitialized: true });
-//     }
-
-//     if (
-//       nextProps.zoomFactor !== this.props.zoomFactor ||
-//       nextProps.probeChangedEvents !== this.props.probeChangedEvents
-//     ) {
-//       console.log(`zoomFactor : ${nextProps.zoomFactor}`);
-//       this.calculateHexBin(nextProps.zoomFactor);
-//       this.paths = this.hexbin(
-//         transformProbesData(nextProps.paths, this.props.projection)
-//       ).sort((a, b) => b.length - a.length);
-//     }
-//   }
-
-//   render() {
-//     let largestBarValue;
-//     return (
-//       <g>
-//         {this.paths &&
-//           this.paths.map((p, idx) => {
-//             const [simpsonIndex, asDistribution, _] = calculateSimpsonIndex(
-//                 p,
-//                 0
-//               ),
-//               // minRttValue = calculateMinRttValue(p),
-//               hexbinBodyColor = this.props.hexbinColorRange(this.props.hexbinBodyColorFunctor && this.props.hexbinBodyColorFunctor(p) || simpsonIndex),
-//               singleProbeScale = ` scale(
-//                ${Math.min(1.4, 2.4 / this.props.zoomFactor)})`,
-//               hexBinScale = " scale(1.0)";
-
-//             //largestBarValue = Math.max(...asDistribution.map(a => a.count.t));
-//             largestBarValue =
-//               (idx === 0 && asDistribution[0].count.t) || largestBarValue;
-//             // debug tooltip
-//             // if (idx === 0) {
-//             //   this.props.showToolTip({
-//             //     probes: [...p], // get rid of the weird confluence of array and object that D3 creates.
-//             //     x: p.x,
-//             //     y: p.y,
-//             //     simpsonIndex: simpsonIndex
-//             //   });
-//             // }
-//             // end debug
-
-//             return (
-//               <path
-//                 key={`h_${p.x}_${p.y}`}
-//                 d={
-//                   (p.length > 1 &&
-//                     this.hexbin.hexagon(this.radius(p.length))) ||
-//                   "M 0,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0"
-//                 }
-//                 transform={`translate(${(p.length > 1 && p.x) ||
-//                   p[0][0]},${(p.length > 1 && p.y) || p[0][1]})${(p.length >
-//                   1 &&
-//                   hexBinScale) ||
-//                   singleProbeScale}`}
-//                 //fill={this.color(median(p, p => +p.date))}
-//                 //fill={this.color(mean(p, p => +p[14]))}
-//                 fill={hexbinBodyColor}
-//                 stroke={this.props.stroke(p)}
-//                 strokeWidth={
-//                   (p.length > 1 && this.radius(p.length) / 5) || "0.2"
-//                 }
-//                 onMouseEnter={e =>
-//                   this.props.showToolTip({
-//                     probes: [...p], // get rid of the weird confluence of array and object that D3 creates.
-//                     x: p.x,
-//                     y: p.y,
-//                     simpsonIndex: simpsonIndex,
-//                     largestBarValue: Math.max(largestBarValue * 1.0), // stupid estimate, but I don't want to go over all bins to see which one has the biggest AS
-//                     //minwidth: 7000,
-//                     asDistribution: asDistribution.slice(0, 10),
-//                     moreNumber: asDistribution.slice(11).length
-//                   })
-//                 }
-//                 onMouseLeave={e => this.props.hideToolTip()}
-//               />
-//             );
-//           })}
-//       </g>
-//     );
-//   }
-// }
-
 export class ProbesHexbinMap extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
       probes: null,
       countries: null,
-      changedProbes: [],
+      changedProbes: [], // these are all the new probe events from DOM ready
+      lightProbes: [], // these are the most recent probe that need to be lighted
       webWorkerAvailability: true
     };
   }
@@ -331,7 +147,7 @@ export class ProbesHexbinMap extends React.Component {
   };
 
   componentDidMount() {
-    const countries = loadCountryGeoInfo().then(
+    loadCountryGeoInfo().then(
       countries => {
         this.setState({ countries: countries });
       },
@@ -342,25 +158,18 @@ export class ProbesHexbinMap extends React.Component {
       }
     );
 
-    const probesData = loadProbesInfo().then(
+    loadProbesInfo().then(
       probesData => {
         console.log("probes data loaded...");
-        //this.setState({ probes: probesData });
 
-        loadRttForProbesData(asn).then(rttData => {
-          let count = 0;
-          const probes = rttData
-            .map(rttP => {
-              const prb_id = probesData.find(p => p[2] === rttP.prb_id);
-              // kick out probes that are now abandoned according to /all
-              if (!prb_id) {
-                return null;
-              }
-              return [...prb_id, (prb_id && rttP.min_rtt) || null];
-            })
-            .filter(p => p);
-          this.setState({ probes: probes });
-        });
+        if (this.props.dataAdapter) {
+          this.props.dataAdapter().then(data => {
+            const serializedData = this.props.dataSerializer(data, probesData);
+            return this.setState({ probes: serializedData });
+          });
+        } else {
+          this.setState({ probes: probesData });
+        }
 
         // initialize probeUpdates webworker
         if (window.Worker) {
@@ -414,11 +223,19 @@ export class ProbesHexbinMap extends React.Component {
                         p => (p.prb_id = thisProbe[2])
                       ).length + 1
                   }
+                ],
+                lightProbes: [
+                  {
+                    prb_id: thisProbe[2],
+                    status: newProbeStatus.event,
+                    dx: thisProbe[0],
+                    dy: thisProbe[1]
+                  }
                 ]
               });
 
               if (updatedProbeIndex > -1) {
-                window.probes = this.state.probes;
+                // window.probes = this.state.probes;
                 this.setState({
                   probes: [
                     ...this.state.probes.slice(0, updatedProbeIndex),
@@ -458,42 +275,19 @@ export class ProbesHexbinMap extends React.Component {
         countries={this.state.countries}
         maxZoomFactor={24}
       >
-        <HexBins
-          paths={this.state.probes}
-          probeChangedEvents={this.state.changedProbes.length}
-          width={this.props.width}
-          height={this.props.height}
-          showToolTip={this.showToolTip}
-          hideToolTip={this.hideToolTip}
-          stroke={p =>
-            scaleLinear()
-              .domain([400, 10])
-              .range(["#FF0050", "#00B213"])
-              .interpolate(interpolateLab)(median(p, p => +p[16]))
-          }
-          hexbinColorRange={scaleLinear()
-            .domain([50, 10, 0])
-            .range(["#FF0050", "yellow", "#00B213"])
-            .interpolate(interpolateLab)}
-          hexbinBodyColorFunctor={calculateMinRttValue}
-        />
-
-        {/*   this.color = scaleLinear()
-      .domain([400, 10])
-      .range(["#FF0050", "#00B213"])
-      .interpolate(interpolateLab);
-
-this.color(median(p, p => +p[16]))
-
-    this.hexbinColorRange = scaleLinear()
-      .domain([50, 10, 0])
-      .range(["#FF0050", "yellow", "#00B213"])
-      .interpolate(interpolateLab); */}
+        {this.props.children({
+          paths: this.state.probes,
+          probeChangedEvents: this.state.changedProbes.length,
+          width: this.props.width,
+          height: this.props.height,
+          showToolTip: this.showToolTip,
+          hideToolTip: this.hideToolTip
+        })}
 
         {this.state.changedProbes.length > 0 &&
-          this.state.changedProbes.map(ps => (
+          this.state.lightProbes.map((ps, i) => (
             <ProbeStatusChanger
-              //key={`ps_${ps.prb_id}_${ps.status}`}
+              key={`ps_${ps.prb_id}_${ps.status}_${i}`}
               dx={ps.dx}
               dy={ps.dy}
               status={ps.status}
@@ -501,6 +295,72 @@ this.color(median(p, p => +p[16]))
           ))}
         {this.state.tooltip}
       </GeoMap>
+    );
+  }
+}
+
+const probesRttSerializer = (rttData, probesData) =>
+  rttData
+    .map(rttP => {
+      const prb_id = probesData.find(p => p[2] === rttP.prb_id);
+      // kick out probes that are now abandoned according to /all
+      if (!prb_id) {
+        return null;
+      }
+      return [...prb_id, (prb_id && rttP.min_rtt) || null];
+    })
+    .filter(p => p);
+
+export class ProbesRttAsnAggregatedMap extends React.Component {
+  render() {
+    return (
+      <ProbesHexbinMap
+        dataAdapter={() => loadRttForProbesData(asn)}
+        dataSerializer={probesRttSerializer}
+        streamUpdates={false}
+        children={hexbinsProps => {
+          return (
+            <HexBins
+              {...hexbinsProps}
+              stroke={p =>
+                scaleLinear()
+                  .domain([400, 10])
+                  .range(["#FF0050", "#00B213"])
+                  .interpolate(interpolateLab)(median(p, p => +p[16]))
+              }
+              hexbinColorRange={scaleLinear()
+                .domain([50, 10, 0])
+                .range(["#FF0050", "yellow", "#00B213"])
+                .interpolate(interpolateLab)}
+              hexbinBodyColorFunctor={calculateMinRttValue}
+            />
+          );
+        }}
+      />
+    );
+  }
+}
+
+export class AllProbesAggregatedMap extends React.Component {
+  render() {
+    return (
+      <ProbesHexbinMap
+        children={hexbinProps => (
+          <HexBins
+            {...hexbinProps}
+            stroke={p =>
+              scaleLinear()
+                .domain([2, 1])
+                .range(["#FF0050", "#00B213"])
+                .interpolate(interpolateLab)(mean(p, p => +p[14]))
+            }
+            hexbinColorRange={scaleLinear()
+              .domain([1, 0])
+              .range(["#F4FFF5", oimEmerald])
+              .interpolate(interpolateLab)}
+          />
+        )}
+      />
     );
   }
 }
