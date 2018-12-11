@@ -12,6 +12,7 @@ import { geoEqualEarth as projection } from "d3-geo";
 
 import {
   GeoMap,
+  HexBins,
   loadCountryGeoInfo,
   SvgToolTip,
   ThumbBar
@@ -115,154 +116,155 @@ export class ProbeStatusChanger extends React.Component {
   }
 }
 
-export class ProjectedPaths extends React.PureComponent {
-  constructor(props) {
-    super(props);
-    this.paths = [];
+// export class ProjectedPaths extends React.PureComponent {
+//   constructor(props) {
+//     super(props);
+//     this.paths = [];
 
-    this.calculateHexBin();
+//     this.calculateHexBin();
 
-    // this.color = scaleTime()
-    //   .domain([
-    //     timeParse("%s")((Date.now() / 1000).toFixed(0) - 86400),
-    //     timeParse("%s")((Date.now() / 1000).toFixed(0) - 864000)
-    //   ])
-    //   .range(["black", "green"])
-    //   .interpolate(interpolateLab);
-    this.color = scaleLinear()
-      .domain([400, 10])
-      .range(["#FF0050", "#00B213"])
-      .interpolate(interpolateLab);
+//     // this.color = scaleTime()
+//     //   .domain([
+//     //     timeParse("%s")((Date.now() / 1000).toFixed(0) - 86400),
+//     //     timeParse("%s")((Date.now() / 1000).toFixed(0) - 864000)
+//     //   ])
+//     //   .range(["black", "green"])
+//     //   .interpolate(interpolateLab);
 
-    this.hexbinColorRange = scaleLinear()
-      .domain([50, 10, 0])
-      .range(["#FF0050", "yellow", "#00B213"])
-      .interpolate(interpolateLab);
+//     // this.color = scaleLinear()
+//     //   .domain([400, 10])
+//     //   .range(["#FF0050", "#00B213"])
+//     //   .interpolate(interpolateLab);
 
-    this.state = {
-      pathsInitialized: false
-    };
-  }
+//     // this.hexbinColorRange = scaleLinear()
+//     //   .domain([50, 10, 0])
+//     //   .range(["#FF0050", "yellow", "#00B213"])
+//     //   .interpolate(interpolateLab);
 
-  calculateHexBin(zoomFactor = 1) {
-    this.hexbin = hexbin()
-      .extent([[0, 0], [this.props.width, this.props.height]])
-      // radius of catchment area, so probes within this radius end up
-      // in one hexbin.
-      .radius(8.5 / zoomFactor);
+//     this.state = {
+//       pathsInitialized: false
+//     };
+//   }
 
-    // map number of probes in hexbin to the size
-    // of the hexbin on screen
-    this.radius = scaleSqrt()
-      .domain([2, 1000])
-      .range([4 / zoomFactor, 1 + 11.5 / zoomFactor]);
-  }
+//   calculateHexBin(zoomFactor = 1) {
+//     this.hexbin = hexbin()
+//       .extent([[0, 0], [this.props.width, this.props.height]])
+//       // radius of catchment area, so probes within this radius end up
+//       // in one hexbin.
+//       .radius(8.5 / zoomFactor);
 
-  componentDidMount() {
-    if (this.props.paths) {
-      console.log("Awas! fast paths loading!");
+//     // map number of probes in hexbin to the size
+//     // of the hexbin on screen
+//     this.radius = scaleSqrt()
+//       .domain([2, 1000])
+//       .range([4 / zoomFactor, 1 + 11.5 / zoomFactor]);
+//   }
 
-      this.paths = hexbin(
-        transformProbesData(this.props.paths, this.props.projection)
-      ).sort((a, b) => b.length - a.length);
+//   componentDidMount() {
+//     if (this.props.paths) {
+//       console.log("Awas! fast paths loading!");
 
-      //this.renderD3Paths({ update: false });
-    }
+//       this.paths = hexbin(
+//         transformProbesData(this.props.paths, this.props.projection)
+//       ).sort((a, b) => b.length - a.length);
 
-    this.setState({ pathsInitialized: true });
-  }
+//       //this.renderD3Paths({ update: false });
+//     }
 
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.paths && !this.props.paths) {
-      console.log("paths received");
-      this.paths = this.hexbin(
-        transformProbesData(nextProps.paths, this.props.projection)
-      ).sort((a, b) => b.length - a.length);
-      this.setState({ pathsInitialized: true });
-    }
+//     this.setState({ pathsInitialized: true });
+//   }
 
-    if (
-      nextProps.zoomFactor !== this.props.zoomFactor ||
-      nextProps.probeChangedEvents !== this.props.probeChangedEvents
-    ) {
-      console.log(`zoomFactor : ${nextProps.zoomFactor}`);
-      this.calculateHexBin(nextProps.zoomFactor);
-      this.paths = this.hexbin(
-        transformProbesData(nextProps.paths, this.props.projection)
-      ).sort((a, b) => b.length - a.length);
-    }
-  }
+//   componentWillReceiveProps(nextProps) {
+//     if (nextProps.paths && !this.props.paths) {
+//       console.log("paths received");
+//       this.paths = this.hexbin(
+//         transformProbesData(nextProps.paths, this.props.projection)
+//       ).sort((a, b) => b.length - a.length);
+//       this.setState({ pathsInitialized: true });
+//     }
 
-  render() {
-    let largestBarValue;
-    return (
-      <g>
-        {this.paths &&
-          this.paths.map((p, idx) => {
-            const [simpsonIndex, asDistribution, _] = calculateSimpsonIndex(
-                p,
-                0
-              ),
-              minRttValue = calculateMinRttValue(p),
-              hexbinBodyColor = this.hexbinColorRange(minRttValue),
-              singleProbeScale = ` scale(
-               ${Math.min(1.4, 2.4 / this.props.zoomFactor)})`,
-              hexBinScale = " scale(1.0)";
+//     if (
+//       nextProps.zoomFactor !== this.props.zoomFactor ||
+//       nextProps.probeChangedEvents !== this.props.probeChangedEvents
+//     ) {
+//       console.log(`zoomFactor : ${nextProps.zoomFactor}`);
+//       this.calculateHexBin(nextProps.zoomFactor);
+//       this.paths = this.hexbin(
+//         transformProbesData(nextProps.paths, this.props.projection)
+//       ).sort((a, b) => b.length - a.length);
+//     }
+//   }
 
-            //largestBarValue = Math.max(...asDistribution.map(a => a.count.t));
-            largestBarValue =
-              (idx === 0 && asDistribution[0].count.t) || largestBarValue;
-            // debug tooltip
-            // if (idx === 0) {
-            //   this.props.showToolTip({
-            //     probes: [...p], // get rid of the weird confluence of array and object that D3 creates.
-            //     x: p.x,
-            //     y: p.y,
-            //     simpsonIndex: simpsonIndex
-            //   });
-            // }
-            // end debug
+//   render() {
+//     let largestBarValue;
+//     return (
+//       <g>
+//         {this.paths &&
+//           this.paths.map((p, idx) => {
+//             const [simpsonIndex, asDistribution, _] = calculateSimpsonIndex(
+//                 p,
+//                 0
+//               ),
+//               // minRttValue = calculateMinRttValue(p),
+//               hexbinBodyColor = this.props.hexbinColorRange(this.props.hexbinBodyColorFunctor && this.props.hexbinBodyColorFunctor(p) || simpsonIndex),
+//               singleProbeScale = ` scale(
+//                ${Math.min(1.4, 2.4 / this.props.zoomFactor)})`,
+//               hexBinScale = " scale(1.0)";
 
-            return (
-              <path
-                key={`h_${p.x}_${p.y}`}
-                d={
-                  (p.length > 1 &&
-                    this.hexbin.hexagon(this.radius(p.length))) ||
-                  "M 0,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0"
-                }
-                transform={`translate(${(p.length > 1 && p.x) ||
-                  p[0][0]},${(p.length > 1 && p.y) || p[0][1]})${(p.length >
-                  1 &&
-                  hexBinScale) ||
-                  singleProbeScale}`}
-                //fill={this.color(median(p, p => +p.date))}
-                //fill={this.color(mean(p, p => +p[14]))}
-                fill={hexbinBodyColor}
-                stroke={this.color(median(p, p => +p[16]))}
-                strokeWidth={
-                  (p.length > 1 && this.radius(p.length) / 5) || "0.2"
-                }
-                onMouseEnter={e =>
-                  this.props.showToolTip({
-                    probes: [...p], // get rid of the weird confluence of array and object that D3 creates.
-                    x: p.x,
-                    y: p.y,
-                    simpsonIndex: simpsonIndex,
-                    largestBarValue: Math.max(largestBarValue * 1.0), // stupid estimate, but I don't want to go over all bins to see which one has the biggest AS
-                    //minwidth: 7000,
-                    asDistribution: asDistribution.slice(0, 10),
-                    moreNumber: asDistribution.slice(11).length
-                  })
-                }
-                onMouseLeave={e => this.props.hideToolTip()}
-              />
-            );
-          })}
-      </g>
-    );
-  }
-}
+//             //largestBarValue = Math.max(...asDistribution.map(a => a.count.t));
+//             largestBarValue =
+//               (idx === 0 && asDistribution[0].count.t) || largestBarValue;
+//             // debug tooltip
+//             // if (idx === 0) {
+//             //   this.props.showToolTip({
+//             //     probes: [...p], // get rid of the weird confluence of array and object that D3 creates.
+//             //     x: p.x,
+//             //     y: p.y,
+//             //     simpsonIndex: simpsonIndex
+//             //   });
+//             // }
+//             // end debug
+
+//             return (
+//               <path
+//                 key={`h_${p.x}_${p.y}`}
+//                 d={
+//                   (p.length > 1 &&
+//                     this.hexbin.hexagon(this.radius(p.length))) ||
+//                   "M 0,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0"
+//                 }
+//                 transform={`translate(${(p.length > 1 && p.x) ||
+//                   p[0][0]},${(p.length > 1 && p.y) || p[0][1]})${(p.length >
+//                   1 &&
+//                   hexBinScale) ||
+//                   singleProbeScale}`}
+//                 //fill={this.color(median(p, p => +p.date))}
+//                 //fill={this.color(mean(p, p => +p[14]))}
+//                 fill={hexbinBodyColor}
+//                 stroke={this.props.stroke(p)}
+//                 strokeWidth={
+//                   (p.length > 1 && this.radius(p.length) / 5) || "0.2"
+//                 }
+//                 onMouseEnter={e =>
+//                   this.props.showToolTip({
+//                     probes: [...p], // get rid of the weird confluence of array and object that D3 creates.
+//                     x: p.x,
+//                     y: p.y,
+//                     simpsonIndex: simpsonIndex,
+//                     largestBarValue: Math.max(largestBarValue * 1.0), // stupid estimate, but I don't want to go over all bins to see which one has the biggest AS
+//                     //minwidth: 7000,
+//                     asDistribution: asDistribution.slice(0, 10),
+//                     moreNumber: asDistribution.slice(11).length
+//                   })
+//                 }
+//                 onMouseLeave={e => this.props.hideToolTip()}
+//               />
+//             );
+//           })}
+//       </g>
+//     );
+//   }
+// }
 
 export class ProbesHexbinMap extends React.Component {
   constructor(props) {
@@ -456,14 +458,37 @@ export class ProbesHexbinMap extends React.Component {
         countries={this.state.countries}
         maxZoomFactor={24}
       >
-        <ProjectedPaths
+        <HexBins
           paths={this.state.probes}
           probeChangedEvents={this.state.changedProbes.length}
           width={this.props.width}
           height={this.props.height}
           showToolTip={this.showToolTip}
           hideToolTip={this.hideToolTip}
+          stroke={p =>
+            scaleLinear()
+              .domain([400, 10])
+              .range(["#FF0050", "#00B213"])
+              .interpolate(interpolateLab)(median(p, p => +p[16]))
+          }
+          hexbinColorRange={scaleLinear()
+            .domain([50, 10, 0])
+            .range(["#FF0050", "yellow", "#00B213"])
+            .interpolate(interpolateLab)}
+          hexbinBodyColorFunctor={calculateMinRttValue}
         />
+
+        {/*   this.color = scaleLinear()
+      .domain([400, 10])
+      .range(["#FF0050", "#00B213"])
+      .interpolate(interpolateLab);
+
+this.color(median(p, p => +p[16]))
+
+    this.hexbinColorRange = scaleLinear()
+      .domain([50, 10, 0])
+      .range(["#FF0050", "yellow", "#00B213"])
+      .interpolate(interpolateLab); */}
 
         {this.state.changedProbes.length > 0 &&
           this.state.changedProbes.map(ps => (
