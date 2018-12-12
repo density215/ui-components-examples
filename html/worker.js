@@ -13,7 +13,7 @@
 // so the Worker() constructor can use it directly.
 
 importScripts("./socket.io.js");
-console.log("starting probes disco...");
+console.log("initializing probes disco...");
 
 let socket = io("https://atlas-stream.ripe.net:443", {
   path: "/stream/socket.io",
@@ -26,6 +26,14 @@ socket.emit("atlas_subscribe", {
   enrichProbes: true
 });
 
-socket.on("atlas_probestatus", r => {
-  self.postMessage(JSON.stringify(r, null));
+socket.on("disconnect", () => {
+  console.log('probes disco halted! restarting...')
+  socket.socket.reconnect();
+});
+
+socket.on("connect", () => {
+  console.log('probes disco starting...')
+  socket.on("atlas_probestatus", r => {
+    self.postMessage(JSON.stringify(r, null));
+  });
 });
