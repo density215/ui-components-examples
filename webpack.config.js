@@ -12,7 +12,14 @@ var dir_geo = path.resolve(
   "./node_modules/@ripe-rnd/ui-components/data/geo"
 );
 
+// API_SERVER
+// the api server that is used to make all API calls to
+// this var will be fed to the top react component.
+var apiServer = process.env.API_SERVER || "atlas.ripe.net";
+
 console.log(path.resolve(__dirname));
+console.log(`using api server ${apiServer}`);
+
 module.exports = {
   entry: [
     // "babel-polyfill",
@@ -96,12 +103,16 @@ module.exports = {
       ]
     }
   },
+  
   plugins: [
     new CopyWebpackPlugin([
       { from: dir_html },
       { from: dir_geo, to: "geo/" },
       { from: "./node_modules/socket.io-client/dist/socket.io.js" }
     ]),
+    new webpack.DefinePlugin({
+      __API_SERVER__: JSON.stringify(apiServer)
+    }),
     // enable HMR globally
     new webpack.HotModuleReplacementPlugin(),
     // prints more readable module names in the browser console on HMR updates

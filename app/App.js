@@ -1,21 +1,8 @@
 import React from "react";
-
-import {
-  AllProbesAggregatedMap,
-  ProbesRttAsnAggregatedMap
-} from "./geo/probesHexBinMaps";
+import { MapsContainer } from "./geo/containers";
 
 const App = props => {
-  return (
-    <>
-      <div>
-        <AllProbesAggregatedMap />
-      </div>
-      {/* <div>
-        <ProbesRttAsnAggregatedMap />
-      </div> */}
-    </>
-  );
+  return <MapsContainer />;
 };
 
 export default App;

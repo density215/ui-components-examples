@@ -28,7 +28,7 @@ socket.emit("atlas_subscribe", {
 
 socket.on("disconnect", () => {
   console.log('probes disco halted! restarting...')
-  socket.socket.reconnect();
+  socket.socket.connect();
 });
 
 socket.on("connect", () => {

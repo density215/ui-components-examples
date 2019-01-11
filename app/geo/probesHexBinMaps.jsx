@@ -1,38 +1,13 @@
 import React from "react";
-
-import { timeParse } from "d3-time-format";
-import { hexbin } from "d3-hexbin";
 import { median, mean, variance, histogram } from "d3-array";
 import { scaleSqrt, scaleTime, scaleLinear } from "d3-scale";
 import { interpolateLab } from "d3-interpolate";
-import styled, { keyframes } from "styled-components";
-
-import { geoEqualEarth as projection } from "d3-geo";
-//import { geoCylindricalStereographic as projection } from "d3-geo-projection";
 
 import { ProbesHexbinMap, HexBins } from "@ripe-rnd/ui-components";
 
-import {
-  loadProbesInfo,
-  loadNewProbeInfo,
-  loadRttForProbesData,
-  loadCountryGeoInfo
-  // transformProbesData
-} from "../adapters";
+import { loadRttForProbesData } from "@ripe-rnd/ui-datastores";
 
-import {
-  ripeMagenta,
-  atlasGreen,
-  oimCarrot,
-  oimClouds,
-  oimLand,
-  oimEmerald,
-  oimAntracite,
-  lColor
-} from "@ripe-rnd/ui-components";
-
-const url_as_frag = window.location.pathname.match(/\/as\/(\d+)/),
-  asn = url_as_frag && url_as_frag[1];
+import { oimEmerald } from "@ripe-rnd/ui-components";
 
 const calculateMinRttValue = p => {
   const v = p.reduce(
@@ -58,10 +33,11 @@ export class ProbesRttAsnAggregatedMap extends React.Component {
   render() {
     return (
       <ProbesHexbinMap
-        dataAdapter={() => loadRttForProbesData(asn)}
+        dataAdapter={() => loadRttForProbesData(this.props.asn)}
         dataSerializer={probesRttSerializer}
         streamUpdates={false}
-        children={hexbinsProps => {
+        apiServer={__API_SERVER__}
+        render={hexbinsProps => {
           return (
             <HexBins
               {...hexbinsProps}
@@ -88,6 +64,7 @@ export class AllProbesAggregatedMap extends React.Component {
   render() {
     return (
       <ProbesHexbinMap
+        apiServer={__API_SERVER__}
         render={hexbinProps => (
           <HexBins
             {...hexbinProps}
