@@ -9,7 +9,8 @@ import {
 
 import { geoOrthographic as projectionType1 } from "d3-geo";
 
-import { GeoMap, loadCountryGeoInfo } from "@ripe-rnd/ui-components";
+import { GeoMap } from "@ripe-rnd/ui-components";
+import { loadCountryGeoInfo } from "@ripe-rnd/ui-datastores";
 
 export class Map extends React.Component {
     constructor(props) {
