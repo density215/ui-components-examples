@@ -15,9 +15,10 @@ var dir_geo = path.resolve(
 console.log(path.resolve(__dirname));
 module.exports = {
   entry: [
-    "babel-polyfill",
-    "react-hot-loader/patch",
-    "webpack/hot/only-dev-server",
+    // "babel-polyfill",
+    // "react-hot-loader/patch",
+    // "webpack/hot/only-dev-server",
+    "core-js",
     path.resolve(dir_app, "index.js") //,
     //path.resolve(dir_app, "worker.js")
     //path.resolve(dir_app, "worker.probeUpdates.js")
@@ -25,16 +26,18 @@ module.exports = {
   module: {
     rules: [
       {
+        test: /\.md?$/,
+        use: ["babel-loader", "markdown-jsx-loader"],
+        include: [/texts/]
+      },
+      {
         test: /\.js[x]?$/,
         //include: [/app/],
         // includes don't work with linked (local) modules,
         // such as the @ripe-rnd/ui-components
         // so excluding is the way to go.
-        exclude: [
-          /.*node_modules\/((?!@ripe-rnd).)*$/ //,
-          ///\.worker\.js$/
-        ],
-        use: ["babel-loader"]
+        exclude: /.*node_modules\/((?!@ripe-rnd).)*$/,
+        use: ["react-hot-loader/webpack", "babel-loader"]
       },
       {
         test: /\.less$/,
@@ -51,11 +54,6 @@ module.exports = {
           { loader: "css-loader", options: { modules: true } }
         ]
       }
-      // },
-      // {
-      //     test: /\.worker\.js$/,
-      //     use: [{ loader: "worker-loader" }, { loader: "babel-loader" }]
-      // }
     ]
   },
   resolve: {
@@ -86,14 +84,14 @@ module.exports = {
     headers: {
       "Access-Control-Allow-Origin": "*"
     },
-    contentBase: dir_build
-  },
-  historyApiFallback: {
-    rewrites: [
-      { from: /bundle\.js/, to: "/bundle.js" },
-      { from: /index\.html/, to: "/index.html" },
-      { from: /as\/[0-9]+/, to: "/index.html" }
-    ]
+    contentBase: dir_build,
+    historyApiFallback: {
+      rewrites: [
+        { from: /bundle\.js/, to: "/bundle.js" },
+        { from: /index\.html/, to: "/index.html" },
+        { from: /as\/[0-9]+/, to: "/index.html" }
+      ]
+    }
   },
   plugins: [
     new CopyWebpackPlugin([
